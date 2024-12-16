@@ -1,0 +1,33 @@
+import { useEffect, useState } from "react";
+import { API_URLs } from "../../shared/common-settings";
+import useAxiosFetch from "../../hooks/useAxiosFetch";
+
+function ServiceMaterials(props) {
+  // const { url } = props;
+  // const [urlMaterials, setUrlMaterials] = useState(null);
+  //   const [urlEdges] = useState(null);
+
+  // const { data: getDataM, error: getErrorM, loading: getLoadingM, isFetching: isGetFetchingM } = useAxiosFetch(urlMaterials, "GET");
+
+  // const { data: materials, loading, error, refetch } = useAxiosFetch(API_URLs.materials);
+
+  // const {
+  //   data: getDataE,
+  //   error: getErrorE,
+  //   loading: getLoadingE,
+  //   isFetching: isGetFetchingE,
+  // } = useAxiosFetch(urlEdges, "GET");
+
+  // useEffect(() => {
+  //   if (!isGetFetchingM && url) {
+  //     setUrlMaterials(API_URLs.materials);
+  //   }
+    // if (!isGetFetchingM && getDataM) {
+    //   setMaterials(getDataM);
+    // }
+  // }, [url, isGetFetchingM]);
+  // }, [isGetFetchingM, getDataM]);
+
+  // return { materials, loading, error, refetch };
+}
+export default ServiceMaterials;

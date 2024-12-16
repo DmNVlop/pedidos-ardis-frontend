@@ -1,0 +1,335 @@
+import { useState, useEffect, useRef, useContext } from "react";
+import { Table, Button, Form, Input, Modal, Popconfirm, message } from "antd";
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from "@ant-design/icons";
+import axios from "axios";
+import Highlighter from "react-highlight-words";
+
+import { API_URLs } from "../../shared/common-settings";
+import { OrdersContext } from "../../context/orders-context";
+// import ServiceMaterials from "./serviceMaterials";
+import useAxiosFetch from "../../hooks/useAxiosFetch";
+
+const component_URL = API_URLs.materials;
+
+const MateriasCRUD = () => {
+  const { resData, loading, error, refetch } = useAxiosFetch(component_URL);
+
+  const { materialsCtx, setMaterialsCtx } = useContext(OrdersContext);
+  const [dataSource, setDataSource] = useState(materialsCtx || []);
+  const [count, setCount] = useState(0);
+  const [editingKey, setEditingKey] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState("");
+  const [searchedColumn, setSearchedColumn] = useState("");
+  const [filters, setFilters] = useState({});
+  const searchInput = useRef(null);
+
+  const handleDelete = async (key) => {
+    try {
+      await axios.delete(`${component_URL}/${key}`);
+      const newData = dataSource.filter((item) => item.key !== key);
+      message.success("Material eliminado correctamente");
+      setDataSource(newData);
+    } catch (error) {
+      message.error("Error al eliminar el material. Error: " + error);
+      console.error("Error deleting material:", error);
+    }
+  };
+
+  const handleAdd = async () => {
+    try {
+      const values = await form.validateFields();
+      const response = await axios.post(component_URL, {
+        data: values,
+      });
+      const newMaterial = response.data.data;
+      setDataSource([...dataSource, { key: newMaterial.documentId, ...newMaterial }]);
+      setCount(count + 1);
+      message.success("Material agregado correctamente");
+      form.resetFields();
+      setIsModalOpen(false);
+    } catch (error) {
+      message.error("Error al agregar el material. Error: " + error);
+      console.error("Error adding material:", error);
+    }
+  };
+
+  const handleEdit = (record) => {
+    form.setFieldsValue(record);
+    console.log("🚀 ~ handleEdit ~ record:", record);
+    setEditingKey(record.key);
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      const response = await axios.put(`${component_URL}/${editingKey}`, {
+        data: values,
+      });
+      const updatedMaterial = response.data.data;
+      const newData = [...dataSource];
+      const index = newData.findIndex((item) => editingKey === item.key);
+      if (index > -1) {
+        const item = newData[index];
+        newData.splice(index, 1, { ...item, ...updatedMaterial });
+        setDataSource(newData);
+        setEditingKey("");
+        setIsModalOpen(false);
+      }
+      message.success("Material actualizado correctamente");
+    } catch (error) {
+      message.error("Error al actualizar el material. Error: " + error);
+      console.error("Error saving material:", error);
+    }
+  };
+
+  const getColumnSearchProps = (dataIndex) => ({
+    filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
+      <div style={{ padding: 8 }}>
+        <Input
+          ref={searchInput}
+          placeholder={`Buscar ${dataIndex}`}
+          value={selectedKeys[0]}
+          onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+          onPressEnter={() => handleSearch(selectedKeys, confirm, dataIndex)}
+          style={{ marginBottom: 8, display: "block" }}
+        />
+        <Button
+          type="primary"
+          onClick={() => handleSearch(selectedKeys, confirm, dataIndex)}
+          icon={<SearchOutlined />}
+          size="small"
+          style={{ width: 90, marginRight: 8 }}>
+          Buscar
+        </Button>
+        <Button onClick={() => handleReset(clearFilters, confirm)} size="small" style={{ width: 90 }}>
+          Resetear
+        </Button>
+      </div>
+    ),
+    filterIcon: (filtered) => <SearchOutlined style={{ color: filtered ? "#1890ff" : undefined, width: "32px" }} />,
+    onFilter: (value, record) => (record[dataIndex] ? record[dataIndex].toString().toLowerCase().includes(value.toLowerCase()) : ""),
+    onFilterDropdownOpenChange: (visible) => {
+      if (visible) {
+        setTimeout(() => searchInput.current.select(), 100);
+      }
+    },
+    render: (text) =>
+      searchedColumn === dataIndex ? (
+        <Highlighter
+          highlightStyle={{ backgroundColor: "#ffc069", padding: 0 }}
+          searchWords={[searchText]}
+          autoEscape
+          textToHighlight={text ? text.toString() : ""}
+        />
+      ) : (
+        text
+      ),
+  });
+
+  const handleSearch = (selectedKeys, confirm, dataIndex) => {
+    confirm();
+    setSearchText(selectedKeys[0]);
+    setSearchedColumn(dataIndex);
+    setFilters((prevFilters) => ({
+      ...prevFilters,
+      [dataIndex]: selectedKeys[0],
+    }));
+  };
+
+  const handleReset = (clearFilters, confirm) => {
+    clearFilters();
+    setSearchText("");
+    confirm();
+    setFilters({});
+  };
+
+  const clearAllFilters = () => {
+    setFilters({});
+    setSearchText("");
+    setSearchedColumn("");
+  };
+
+  // const handleImport = async (file) => {
+  //   const reader = new FileReader();
+  //   reader.onload = async (e) => {
+  //     const data = new Uint8Array(e.target.result);
+  //     const workbook = XLSX.read(data, { type: "array" });
+  //     const sheetName = workbook.SheetNames[0];
+  //     const worksheet = workbook.Sheets[sheetName];
+  //     const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+  //     try {
+  //       const response = await axios.post(`${component_URL}/bulk`, {
+  //         data: jsonData,
+  //       });
+  //       const newMaterials = response.data.data.map((material) => ({
+  //         key: material.documentId,
+  //         ...material,
+  //       }));
+  //       setDataSource([...dataSource, ...newMaterials]);
+  //       setCount(count + newMaterials.length);
+  //       message.success("Materiales importados correctamente");
+  //     } catch (error) {
+  //       message.error("Error al importar los materiales. Error: " + error);
+  //       console.error("Error importing materials:", error);
+  //     }
+  //   };
+  //   reader.readAsArrayBuffer(file);
+  // };
+
+  const columns = [
+    {
+      title: "Nombre",
+      dataIndex: "material",
+      key: "material",
+      ...getColumnSearchProps("material"),
+    },
+    {
+      title: "Veta",
+      dataIndex: "sv",
+      key: "sv",
+      ...getColumnSearchProps("sv"),
+    },
+    {
+      title: "Espesor",
+      dataIndex: "thickness",
+      key: "thickness",
+      ...getColumnSearchProps("thickness"),
+    },
+    {
+      title: "Largo",
+      dataIndex: "width",
+      key: "width",
+      ...getColumnSearchProps("width"),
+    },
+    {
+      title: "Ancho",
+      dataIndex: "height",
+      key: "height",
+      ...getColumnSearchProps("height"),
+    },
+    {
+      title: "Cantidad",
+      dataIndex: "quantity",
+      key: "quantity",
+      ...getColumnSearchProps("quantity"),
+    },
+    {
+      title: "Disponibilidad",
+      dataIndex: "availability",
+      key: "availability",
+      ...getColumnSearchProps("availability"),
+    },
+    {
+      title: "Acción",
+      // <div>
+      //   Acción
+      //   <Button
+      //     icon={<CloseCircleOutlined />}
+      //     onClick={clearAllFilters}
+      //     style={{ marginLeft: 8 }}
+      //   />
+      // </div>
+      key: "accion",
+      render: (_, record) => (
+        <>
+          <Button onClick={() => handleEdit(record)} style={{ marginRight: 8 }}>
+            <EditOutlined />
+          </Button>
+          <Popconfirm title="¿Seguro que quieres eliminar?" onConfirm={() => handleDelete(record.key)}>
+            <Button>
+              <DeleteOutlined />
+            </Button>
+          </Popconfirm>
+        </>
+      ),
+    },
+  ];
+
+  useEffect(() => {
+    if (resData && Array.isArray(resData?.data)) {
+      setMaterialsCtx(resData.data);
+      const formattedMaterials = resData.data.map((item) => ({
+        ...item,
+        key: item.id || item.documentId, // Asegurar clave única
+      }));
+      setDataSource(formattedMaterials);
+    }
+  }, [resData]);
+
+  return (
+    <>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}>
+        <h2>Materiales</h2>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            form.resetFields();
+            setIsModalOpen(true);
+          }}>
+          Agregar Materia
+        </Button>
+
+        {/* <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            form.resetFields();
+            setIsModalOpen(true);
+          }}
+        >
+          Importar
+        </Button> */}
+      </div>
+      <Table dataSource={dataSource} columns={columns} rowKey="key" />
+      <Modal
+        title={editingKey === "" ? "Agregar Materia" : "Editar Materia"}
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        onOk={editingKey === "" ? handleAdd : handleSave}>
+        <Form form={form} layout="vertical">
+          <Form.Item name="material" label="Nombre" rules={[{ required: true, message: "Por favor ingrese el nombre" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="sv" label="Veta">
+            <Input />
+          </Form.Item>
+          <Form.Item name="thickness" label="Espesor">
+            <Input />
+          </Form.Item>
+          <Form.Item name="width" label="Largo" rules={[{ required: true, message: "Por favor ingrese el largo" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="height" label="Ancho" rules={[{ required: true, message: "Por favor ingrese el ancho" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="quantity" label="Cantidad" rules={[{ required: true, message: "Por favor ingrese la cantidad" }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="availability"
+            label="Disponibilidad"
+            rules={[
+              {
+                required: true,
+                message: "Por favor ingrese la disponibilidad",
+              },
+            ]}>
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  );
+};
+
+export default MateriasCRUD;
